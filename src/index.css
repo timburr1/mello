@@ -1,0 +1,72 @@
+@import 'tailwindcss';
+
+/*
+ * Semantic colour tokens rather than raw palette classes in the markup.
+ * Tailwind v4 compiles `bg-surface` down to `var(--color-surface)`, so
+ * redefining the variable under a media query re-themes the whole app without
+ * a single `dark:` variant or a second class on every element.
+ */
+@theme {
+  --color-surface: #eef1f6;
+  --color-raised: #ffffff;
+  --color-sunken: #e2e6ee;
+  --color-ink: #141a26;
+  --color-muted: #5c6575;
+  --color-line: #d3d9e4;
+  --color-accent: #2f5fe0;
+  --color-accent-ink: #ffffff;
+  --color-done: #198754;
+  --color-overdue: #c6452c;
+  --color-streak: #b4690e;
+
+  --font-sans:
+    ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --color-surface: #0f172a;
+    --color-raised: #1b2436;
+    --color-sunken: #151d2e;
+    --color-ink: #e9edf5;
+    --color-muted: #96a1b5;
+    --color-line: #2c3650;
+    --color-accent: #6b93ff;
+    --color-accent-ink: #0b1120;
+    --color-done: #41c98a;
+    --color-overdue: #ff8569;
+    --color-streak: #e8b765;
+  }
+}
+
+html {
+  /* Keeps the board clear of the iPhone notch and home indicator when
+     installed to the home screen. */
+  padding: env(safe-area-inset-top) env(safe-area-inset-right) env(safe-area-inset-bottom)
+    env(safe-area-inset-left);
+  background-color: var(--color-surface);
+}
+
+body {
+  margin: 0;
+  background-color: var(--color-surface);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  /* The board scrolls horizontally; the page itself should not bounce. */
+  overscroll-behavior: none;
+}
+
+/* Dragging a card on a touch screen must not also scroll the column. */
+[data-dnd-draggable] {
+  touch-action: manipulation;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

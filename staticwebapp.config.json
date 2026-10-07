@@ -1,0 +1,36 @@
+{
+  "routes": [
+    {
+      "route": "/api/*",
+      "allowedRoles": ["authenticated"]
+    },
+    {
+      "route": "/login",
+      "rewrite": "/.auth/login/github"
+    },
+    {
+      "route": "/logout",
+      "redirect": "/.auth/logout"
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/icons/*",
+      "/api/*",
+      "/favicon.svg",
+      "/manifest.webmanifest",
+      "/sw.js"
+    ]
+  },
+  "responseOverrides": {
+    "401": {
+      "statusCode": 302,
+      "redirect": "/.auth/login/github"
+    }
+  },
+  "platform": {
+    "apiRuntime": "node:22"
+  }
+}
