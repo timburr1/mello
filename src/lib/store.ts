@@ -147,6 +147,48 @@ function positionForDrop(ordered: { id: string; position: number }[], beforeId: 
   return positionBetween(before, after);
 }
 
+function listNamed(board: Board, names: string[]): BoardList | null {
+  return visibleLists(board).find((l) => names.includes(l.name.trim().toLowerCase())) ?? null;
+}
+
+/** The list completed cards live in, found by name so it survives a re-sync. */
+export function findDoneList(board: Board): BoardList | null {
+  return listNamed(board, ['done']);
+}
+
+/**
+ * Where an un-done card goes back to: a list called Todo, or failing that the
+ * first list that is not Done.
+ */
+export function findTodoList(board: Board): BoardList | null {
+  const named = listNamed(board, ['todo', 'to do', 'to-do']);
+  if (named) return named;
+  const done = findDoneList(board);
+  return visibleLists(board).find((l) => l.id !== done?.id) ?? null;
+}
+
+/**
+ * Sets `done`, recording or withdrawing a completion for recurring cards.
+ * Un-ticking withdraws the completion it recorded, otherwise a mis-tap would
+ * inflate the streak permanently.
+ */
+function withDone(card: Card, done: boolean, now: string): Card {
+  if (card.done === done) return card;
+  if (!done) {
+    const completions = card.recurrence ? card.completions.slice(1) : card.completions;
+    return { ...card, done: false, completions };
+  }
+  if (card.recurrence) return addCompletion(card, new Date(now));
+  return { ...card, done: true };
+}
+
+/** Top of Done (newest first), bottom of anything else. */
+function placementIn(board: Board, cardId: string, list: BoardList, done: BoardList | null): number {
+  const ordered = visibleCards(board, list.id).filter((c) => c.id !== cardId);
+  const beforeId = list.id === done?.id ? (ordered[0]?.id ?? null) : null;
+  return positionForDrop(ordered, beforeId);
+}
+
 export function reducer(state: BoardState, action: Action): BoardState {
   switch (action.kind) {
     case 'hydrate':
@@ -256,26 +298,32 @@ export function reducer(state: BoardState, action: Action): BoardState {
         card.deletedAt ? card : { ...card, deletedAt: now },
       );
 
-    case 'toggleCard':
+    case 'toggleCard': {
+      // Ticking files the card into Done; un-ticking a card in Done sends it
+      // back to Todo, so finished work never lingers in the working lists.
+      const doneList = findDoneList(state.board);
+      const todoList = findTodoList(state.board);
       return patchCard(state, action.id, (card, now) => {
-        if (card.done) {
-          // Un-ticking a recurring card withdraws the completion it recorded,
-          // otherwise a mis-tap would inflate the streak permanently.
-          const completions = card.recurrence ? card.completions.slice(1) : card.completions;
-          return { ...card, done: false, completions };
-        }
-        if (card.recurrence) return addCompletion(card, new Date(now));
-        return { ...card, done: true };
+        const next = withDone(card, !card.done, now);
+        const dest = next.done ? doneList : card.listId === doneList?.id ? todoList : null;
+        if (!dest || dest.id === card.listId) return next;
+        const position = placementIn(state.board, card.id, dest, doneList);
+        return { ...next, listId: dest.id, position };
       });
+    }
 
     case 'moveCard': {
       const target = visibleCards(state.board, action.listId).filter((c) => c.id !== action.id);
       const position = positionForDrop(target, action.beforeId);
-      return patchCard(state, action.id, (card) =>
-        card.listId === action.listId && card.position === position
-          ? card
-          : { ...card, listId: action.listId, position },
-      );
+      const doneList = findDoneList(state.board);
+      return patchCard(state, action.id, (card, now) => {
+        if (card.listId === action.listId && card.position === position) return card;
+        const moved = { ...card, listId: action.listId, position };
+        // Dragging across the Done boundary is the same as ticking or
+        // un-ticking, so a card's checkbox always agrees with its column.
+        if (!doneList || card.listId === action.listId) return moved;
+        return withDone(moved, action.listId === doneList.id, now);
+      });
     }
 
     case 'addSubtask': {
@@ -302,8 +350,24 @@ export function reducer(state: BoardState, action: Action): BoardState {
       }));
 
     case 'rollForward': {
-      const { cards, changed } = rollBoardForward(state.board.cards, new Date());
+      const { cards: rolled, changed } = rollBoardForward(state.board.cards, new Date());
       if (changed.length === 0) return state;
+      // A recurring card sitting in Done comes back to Todo when its next
+      // period starts. Appended one after another so several returning at
+      // once keep distinct positions.
+      const doneList = findDoneList(state.board);
+      const todoList = findTodoList(state.board);
+      let cards = rolled;
+      if (doneList && todoList) {
+        const returning = new Set(changed);
+        let tail = endPosition(visibleCards(state.board, todoList.id).map((c) => c.position));
+        cards = rolled.map((card) => {
+          if (!returning.has(card.id) || card.listId !== doneList.id) return card;
+          const position = tail;
+          tail = positionBetween(tail, null);
+          return { ...card, listId: todoList.id, position };
+        });
+      }
       return {
         ...state,
         board: { ...state.board, cards },

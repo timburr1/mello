@@ -19,7 +19,7 @@ export default function App() {
   return (
     <div className="flex h-dvh flex-col">
       <header className="flex shrink-0 items-center justify-between gap-3 border-b border-line px-3 py-2">
-        <h1 className="text-lg font-semibold tracking-tight text-ink">mello</h1>
+        <h1 className="text-lg font-semibold tracking-tight text-ink">Mello</h1>
         <div className="flex items-center gap-2">
           <SyncStatus />
           <button

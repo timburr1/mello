@@ -1,4 +1,4 @@
-# mello
+# Mello
 ![](https://img.shields.io/github/repo-size/timburr1/mello)
 ![](https://img.shields.io/github/contributors/timburr1/mello)
 ![](https://img.shields.io/github/last-commit/timburr1/mello)
@@ -35,6 +35,12 @@ is no API in front of the Vite dev server, which is harmless — everything else
 
 To run the API too, you need the [Static Web Apps CLI][swa-cli] and
 [Azure Functions Core Tools][func-tools]:
+
+```bash
+npm i -g azure-functions-core-tools@4 --unsafe-perm true
+```
+
+Then:
 
 ```bash
 cp api/local.settings.sample.json api/local.settings.json

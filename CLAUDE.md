@@ -29,6 +29,15 @@ npx @azure/static-web-apps-cli start dist --api-location api
 
 Copy `api/local.settings.sample.json` to `api/local.settings.json` and fill in
 `COSMOS_CONNECTION_STRING` first. `local.settings.json` is gitignored and must stay that way.
+`swa start` needs Azure Functions Core Tools v4 on the PATH
+(`npm i -g azure-functions-core-tools@4 --unsafe-perm true`) or it serves the static files
+and silently skips the API.
+
+Sign in at `/.auth/login/github`, which is the SWA CLI's auth emulator. Note it mints a
+**different `userId` on every login**, and that id is the Cosmos partition key - so a second
+browser profile that logs in separately lands in its own partition and sees an empty board.
+To emulate two devices as the same user, copy the auth cookie into the second browser
+context rather than logging in twice.
 
 ## Architecture
 
@@ -100,7 +109,8 @@ Azure Static Web Apps, via `.github/workflows/azure-static-web-apps.yml` on ever
 `main` (PRs get preview environments, torn down on close). The client is built in the workflow
 and uploaded with `skip_app_build: true`; Oryx builds `api/`.
 
-`staticwebapp.config.json` restricts `/api/*` to the `authenticated` role, rewrites unknown
+`public/staticwebapp.config.json` (copied into `dist/` by Vite, since `dist/` is what gets
+uploaded) restricts `/api/*` to the `authenticated` role, rewrites unknown
 routes to `/index.html`, and pins the API runtime to `node:22`. If you add new static files at
 the root of `public/`, add them to the `navigationFallback.exclude` list.
 

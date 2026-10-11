@@ -128,6 +128,150 @@ describe('toggleCard', () => {
   });
 });
 
+describe('the Done list', () => {
+  function board(): { state: BoardState; todo: string; doing: string; done: string } {
+    const state = run([
+      { kind: 'addList', name: 'Todo' },
+      { kind: 'addList', name: 'Doing' },
+      { kind: 'addList', name: 'Done' },
+    ]);
+    const [todo, doing, done] = state.board.lists.map((l) => l.id);
+    return { state, todo, doing, done };
+  }
+
+  function localMidnight(daysFromToday: number): string {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), d.getDate() + daysFromToday).toISOString();
+  }
+
+  it('files a ticked card into Done, at the top', () => {
+    const { state, doing, done } = board();
+    const filled = run(
+      [
+        { kind: 'addCard', listId: done, title: 'old news' },
+        { kind: 'addCard', listId: doing, title: 'Buy milk' },
+      ],
+      state,
+    );
+    const id = filled.board.cards[1].id;
+    const ticked = reducer(filled, { kind: 'toggleCard', id });
+    expect(visibleCards(ticked.board, doing)).toHaveLength(0);
+    expect(visibleCards(ticked.board, done).map((c) => c.title)).toEqual(['Buy milk', 'old news']);
+  });
+
+  it('sends an un-ticked card from Done back to Todo', () => {
+    const { state, doing, todo } = board();
+    const added = reducer(state, { kind: 'addCard', listId: doing, title: 'Buy milk' });
+    const id = added.board.cards[0].id;
+    const toggled = run(
+      [
+        { kind: 'toggleCard', id },
+        { kind: 'toggleCard', id },
+      ],
+      added,
+    );
+    expect(toggled.board.cards[0].done).toBe(false);
+    expect(toggled.board.cards[0].listId).toBe(todo);
+  });
+
+  it('marks a card done when dragged into Done, and not done when dragged out', () => {
+    const { state, todo, doing, done } = board();
+    const added = reducer(state, { kind: 'addCard', listId: todo, title: 'Buy milk' });
+    const id = added.board.cards[0].id;
+    const intoDone = reducer(added, { kind: 'moveCard', id, listId: done, beforeId: null });
+    expect(intoDone.board.cards[0].done).toBe(true);
+    const outOfDone = reducer(intoDone, { kind: 'moveCard', id, listId: doing, beforeId: null });
+    expect(outOfDone.board.cards[0].done).toBe(false);
+  });
+
+  it('leaves done alone when moving between other lists', () => {
+    const { state, todo, doing } = board();
+    const added = reducer(state, { kind: 'addCard', listId: todo, title: 'Buy milk' });
+    const id = added.board.cards[0].id;
+    const moved = reducer(added, { kind: 'moveCard', id, listId: doing, beforeId: null });
+    expect(moved.board.cards[0].done).toBe(false);
+  });
+
+  it('returns a recurring card to Todo, unticked, when its next period starts', () => {
+    const { state, todo, done } = board();
+    const added = reducer(state, { kind: 'addCard', listId: todo, title: 'Water plants' });
+    const id = added.board.cards[0].id;
+    const ticked = run(
+      [
+        {
+          kind: 'updateCard',
+          id,
+          patch: { recurrence: { freq: 'daily', interval: 1 }, dueAt: localMidnight(-1) },
+        },
+        { kind: 'toggleCard', id },
+      ],
+      added,
+    );
+    expect(ticked.board.cards[0].listId).toBe(done);
+
+    const rolled = reducer(ticked, { kind: 'rollForward' });
+    expect(rolled.board.cards[0].listId).toBe(todo);
+    expect(rolled.board.cards[0].done).toBe(false);
+    expect(rolled.board.cards[0].completions).toHaveLength(1);
+  });
+
+  it('keeps a recurring card in Done until its period is over', () => {
+    const { state, todo, done } = board();
+    const added = reducer(state, { kind: 'addCard', listId: todo, title: 'Water plants' });
+    const id = added.board.cards[0].id;
+    const ticked = run(
+      [
+        {
+          kind: 'updateCard',
+          id,
+          patch: { recurrence: { freq: 'daily', interval: 1 }, dueAt: localMidnight(0) },
+        },
+        { kind: 'toggleCard', id },
+        { kind: 'rollForward' },
+      ],
+      added,
+    );
+    expect(ticked.board.cards[0].listId).toBe(done);
+    expect(ticked.board.cards[0].done).toBe(true);
+  });
+
+  it('does not pull an unfinished recurring card out of another list', () => {
+    const { state, doing } = board();
+    const added = reducer(state, { kind: 'addCard', listId: doing, title: 'Water plants' });
+    const id = added.board.cards[0].id;
+    const rolled = run(
+      [
+        {
+          kind: 'updateCard',
+          id,
+          patch: { recurrence: { freq: 'daily', interval: 1 }, dueAt: localMidnight(-1) },
+        },
+        { kind: 'rollForward' },
+      ],
+      added,
+    );
+    expect(rolled.board.cards[0].listId).toBe(doing);
+  });
+
+  it('falls back to the first non-Done list when there is no Todo', () => {
+    const state = run([
+      { kind: 'addList', name: 'Backlog' },
+      { kind: 'addList', name: 'done ' },
+    ]);
+    const [backlog, done] = state.board.lists.map((l) => l.id);
+    const added = reducer(state, { kind: 'addCard', listId: done, title: 'Buy milk' });
+    const id = added.board.cards[0].id;
+    const toggled = run(
+      [
+        { kind: 'toggleCard', id },
+        { kind: 'toggleCard', id },
+      ],
+      added,
+    );
+    expect(toggled.board.cards[0].listId).toBe(backlog);
+  });
+});
+
 describe('moveCard', () => {
   it('moves a card to another list and keeps it visible there', () => {
     const base = run([
