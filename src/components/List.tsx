@@ -14,8 +14,8 @@ export function List({ list, onOpenCard }: { list: BoardList; onOpenCard: (id: s
   const cards = visibleCards(state.board, list.id);
   const remaining = cards.filter((c) => !c.done).length;
 
-  // A separate droppable covering the column lets a card be dropped into an
-  // empty list, where there is no card to hover over.
+  // The whole column is a droppable so a card can be dropped into an empty list,
+  // where there is no card to hover over.
   const { setNodeRef: setDropRef, isOver } = useDroppable({
     id: `list-drop-${list.id}`,
     data: { type: 'listDrop', listId: list.id },
@@ -31,7 +31,11 @@ export function List({ list, onOpenCard }: { list: BoardList; onOpenCard: (id: s
 
   return (
     <section
-      className="flex max-h-full w-[85vw] shrink-0 snap-start flex-col rounded-xl bg-sunken sm:w-72"
+      ref={setDropRef}
+      className={
+        'flex max-h-full w-[85vw] shrink-0 snap-start flex-col rounded-xl bg-sunken sm:w-72 ' +
+        (isOver ? 'ring-2 ring-accent/40' : '')
+      }
     >
       <header className="px-3 pt-3 pb-2">
         <span className="block truncate text-sm font-semibold text-ink">{list.name}</span>
@@ -40,12 +44,7 @@ export function List({ list, onOpenCard }: { list: BoardList; onOpenCard: (id: s
         </span>
       </header>
 
-      <div
-        ref={setDropRef}
-        className={
-          'min-h-[3rem] flex-1 overflow-y-auto px-2 pb-2 ' + (isOver ? 'bg-surface/40' : '')
-        }
-      >
+      <div className={'flex-1 overflow-y-auto px-2 pb-2 ' + (cards.length === 0 && !composing ? 'min-h-[3rem]' : '')}>
         <SortableContext items={cards.map((c) => c.id)} strategy={verticalListSortingStrategy}>
           <ul className="space-y-2">
             {cards.map((card) => (
