@@ -40,6 +40,7 @@ export function BoardProvider({ children }: { children: ReactNode }) {
       dirty: meta.dirty,
       lastSyncedAt: meta.lastSyncedAt,
     });
+    dispatch({ kind: 'ensureLists' });
     dispatch({ kind: 'rollForward' });
   }, []);
 
@@ -90,6 +91,8 @@ export function BoardProvider({ children }: { children: ReactNode }) {
           lastSyncedAt: result.serverTime,
           acknowledged: result.acknowledged,
         });
+        // A pull can bring in lists from an older device; fold them in.
+        dispatch({ kind: 'ensureLists' });
       })
       .catch((error: unknown) => {
         if (error instanceof AuthRequiredError) {

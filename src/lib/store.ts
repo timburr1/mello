@@ -33,10 +33,8 @@ export interface BoardState {
 
 export type Action =
   | { kind: 'hydrate'; board: Board; dirty: string[]; lastSyncedAt: string | null }
+  | { kind: 'ensureLists' }
   | { kind: 'addList'; name: string }
-  | { kind: 'renameList'; id: string; name: string }
-  | { kind: 'deleteList'; id: string }
-  | { kind: 'moveList'; id: string; beforeId: string | null }
   | { kind: 'addCard'; listId: string; title: string }
   | { kind: 'updateCard'; id: string; patch: CardPatch }
   | { kind: 'deleteCard'; id: string }
@@ -53,6 +51,18 @@ export type Action =
 export type CardPatch = Partial<
   Pick<Card, 'title' | 'description' | 'dueAt' | 'recurrence' | 'done'>
 >;
+
+/**
+ * The board's fixed columns. The ids are deterministic so that every device
+ * that seeds them produces the same records, and sync merges them instead of
+ * duplicating them.
+ */
+export const FIXED_LISTS = [
+  { id: 'list-todo', name: 'TODO' },
+  { id: 'list-today', name: 'Today' },
+  { id: 'list-doing', name: 'Doing' },
+  { id: 'list-done', name: 'Done' },
+] as const;
 
 export function initialState(): BoardState {
   return {
@@ -103,28 +113,6 @@ function patchCard(state: BoardState, id: string, fn: (card: Card, now: string) 
   return {
     ...state,
     board: { ...state.board, cards },
-    dirty: withDirty(state.dirty, [id]),
-  };
-}
-
-function patchList(
-  state: BoardState,
-  id: string,
-  fn: (list: BoardList, now: string) => BoardList,
-): BoardState {
-  const now = stamp();
-  let touched = false;
-  const lists = state.board.lists.map((list) => {
-    if (list.id !== id) return list;
-    const next = fn(list, now);
-    if (next === list) return list;
-    touched = true;
-    return { ...next, updatedAt: now };
-  });
-  if (!touched) return state;
-  return {
-    ...state,
-    board: { ...state.board, lists },
     dirty: withDirty(state.dirty, [id]),
   };
 }
@@ -200,6 +188,54 @@ export function reducer(state: BoardState, action: Action): BoardState {
         lastSyncedAt: action.lastSyncedAt,
       };
 
+    case 'ensureLists': {
+      // Idempotent: creates any missing fixed list, then folds every other
+      // list (a random-id one from an older version, or one that arrived by
+      // sync) into the fixed list of the same name, or TODO if none matches.
+      const now = stamp();
+      const fixedIds = new Set<string>(FIXED_LISTS.map((f) => f.id));
+      const touched: string[] = [];
+      let lists = state.board.lists;
+      let cards = state.board.cards;
+
+      FIXED_LISTS.forEach((fixed, index) => {
+        const existing = lists.find((l) => l.id === fixed.id);
+        if (existing && !existing.deletedAt) return;
+        const list: BoardList = {
+          id: fixed.id,
+          type: 'list',
+          userId: existing?.userId ?? '',
+          name: fixed.name,
+          position: index + 1,
+          updatedAt: now,
+          deletedAt: null,
+        };
+        lists = existing ? lists.map((l) => (l.id === fixed.id ? list : l)) : [...lists, list];
+        touched.push(list.id);
+      });
+
+      const strays = lists.filter((l) => !fixedIds.has(l.id) && !l.deletedAt);
+      for (const stray of strays) {
+        const target =
+          FIXED_LISTS.find((f) => f.name.toLowerCase() === stray.name.trim().toLowerCase()) ??
+          FIXED_LISTS[0];
+        cards = cards.map((c) => {
+          if (c.listId !== stray.id) return c;
+          touched.push(c.id);
+          return { ...c, listId: target.id, updatedAt: now };
+        });
+        lists = lists.map((l) => (l.id === stray.id ? { ...l, deletedAt: now, updatedAt: now } : l));
+        touched.push(stray.id);
+      }
+
+      if (touched.length === 0) return state;
+      return {
+        ...state,
+        board: { lists, cards },
+        dirty: withDirty(state.dirty, touched),
+      };
+    }
+
     case 'addList': {
       const name = action.name.trim();
       if (!name) return state;
@@ -218,38 +254,6 @@ export function reducer(state: BoardState, action: Action): BoardState {
         board: { ...state.board, lists: [...state.board.lists, list] },
         dirty: withDirty(state.dirty, [list.id]),
       };
-    }
-
-    case 'renameList': {
-      const name = action.name.trim();
-      if (!name) return state;
-      return patchList(state, action.id, (list) => (list.name === name ? list : { ...list, name }));
-    }
-
-    case 'deleteList': {
-      // Tombstone the list and everything on it, in one stamped batch, so the
-      // delete competes as a single write on the sync timeline.
-      const now = stamp();
-      const doomed = state.board.cards.filter((c) => c.listId === action.id && !c.deletedAt);
-      const lists = state.board.lists.map((l) =>
-        l.id === action.id ? { ...l, deletedAt: now, updatedAt: now } : l,
-      );
-      const cards = state.board.cards.map((c) =>
-        c.listId === action.id && !c.deletedAt ? { ...c, deletedAt: now, updatedAt: now } : c,
-      );
-      return {
-        ...state,
-        board: { lists, cards },
-        dirty: withDirty(state.dirty, [action.id, ...doomed.map((c) => c.id)]),
-      };
-    }
-
-    case 'moveList': {
-      const ordered = visibleLists(state.board).filter((l) => l.id !== action.id);
-      const position = positionForDrop(ordered, action.beforeId);
-      return patchList(state, action.id, (list) =>
-        list.position === position ? list : { ...list, position },
-      );
     }
 
     case 'addCard': {

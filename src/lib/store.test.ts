@@ -42,8 +42,9 @@ describe('dirty tracking', () => {
   it('does not flag a no-op edit', () => {
     const { state, listId } = withList();
     const added = reducer(state, { kind: 'addCard', listId, title: 'Buy milk' });
-    const cleared: BoardState = { ...added, dirty: [] };
-    const again = reducer(cleared, { kind: 'renameList', id: listId, name: 'Todo' });
+    const deleted = reducer(added, { kind: 'deleteCard', id: added.board.cards[0].id });
+    const cleared: BoardState = { ...deleted, dirty: [] };
+    const again = reducer(cleared, { kind: 'deleteCard', id: added.board.cards[0].id });
     expect(again.dirty).toEqual([]);
     expect(again).toBe(cleared);
   });
@@ -64,22 +65,6 @@ describe('deleting', () => {
     expect(deleted.board.cards).toHaveLength(1);
     expect(deleted.board.cards[0].deletedAt).not.toBeNull();
     expect(visibleCards(deleted.board, listId)).toHaveLength(0);
-  });
-
-  it('cascades a list delete to its cards', () => {
-    const { state, listId } = withList();
-    const filled = run(
-      [
-        { kind: 'addCard', listId, title: 'one' },
-        { kind: 'addCard', listId, title: 'two' },
-      ],
-      state,
-    );
-    const deleted = reducer(filled, { kind: 'deleteList', id: listId });
-    expect(visibleLists(deleted.board)).toHaveLength(0);
-    expect(deleted.board.cards.every((c) => c.deletedAt !== null)).toBe(true);
-    // The list and both cards all need pushing.
-    expect(deleted.dirty).toHaveLength(3);
   });
 });
 
@@ -374,5 +359,37 @@ describe('importBoard', () => {
     const imported = reducer(initialState(), { kind: 'importBoard', board: added.board });
     expect(imported.dirty).toHaveLength(2);
     expect(visibleLists(imported.board)).toHaveLength(1);
+  });
+});
+
+describe('ensureLists', () => {
+  it('seeds the four fixed lists in order', () => {
+    const state = run([{ kind: 'ensureLists' }]);
+    expect(visibleLists(state.board).map((l) => l.name)).toEqual(['TODO', 'Today', 'Doing', 'Done']);
+  });
+
+  it('is idempotent', () => {
+    const once = run([{ kind: 'ensureLists' }]);
+    expect(reducer(once, { kind: 'ensureLists' })).toBe(once);
+  });
+
+  it('folds a stray list into the fixed list of the same name, else TODO', () => {
+    const start = run([
+      { kind: 'addList', name: 'doing' },
+      { kind: 'addList', name: 'Errands' },
+    ]);
+    const [doing, errands] = start.board.lists;
+    const withCards = run(
+      [
+        { kind: 'addCard', listId: doing.id, title: 'a' },
+        { kind: 'addCard', listId: errands.id, title: 'b' },
+        { kind: 'ensureLists' },
+      ],
+      start,
+    );
+    const lists = visibleLists(withCards.board);
+    expect(lists.map((l) => l.id)).toEqual(['list-todo', 'list-today', 'list-doing', 'list-done']);
+    expect(visibleCards(withCards.board, 'list-doing').map((c) => c.title)).toEqual(['a']);
+    expect(visibleCards(withCards.board, 'list-todo').map((c) => c.title)).toEqual(['b']);
   });
 });

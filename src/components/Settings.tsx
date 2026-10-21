@@ -145,7 +145,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
         <section>
           <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">About</h3>
           <p className="text-sm text-muted">
-            mello keeps your board in this browser and syncs it to your own Azure account. No
+            Mello keeps your board in this browser and syncs it to your own Azure account. No
             analytics, no third-party scripts, nothing phoning home.
           </p>
         </section>
