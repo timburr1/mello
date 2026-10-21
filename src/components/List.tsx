@@ -33,7 +33,7 @@ export function List({ list, onOpenCard }: { list: BoardList; onOpenCard: (id: s
     <section
       ref={setDropRef}
       className={
-        'flex max-h-full w-[85vw] shrink-0 snap-start flex-col rounded-xl bg-sunken sm:w-72 ' +
+        'flex flex-col rounded-xl bg-sunken sm:max-h-full sm:w-72 sm:shrink-0 ' +
         (isOver ? 'ring-2 ring-accent/40' : '')
       }
     >

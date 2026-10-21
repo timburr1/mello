@@ -3,7 +3,8 @@ import {
   DndContext,
   DragOverlay,
   KeyboardSensor,
-  PointerSensor,
+  MouseSensor,
+  TouchSensor,
   closestCorners,
   useSensor,
   useSensors,
@@ -22,10 +23,11 @@ export function Board({ onOpenCard }: { onOpenCard: (id: string) => void }) {
   const lists = visibleLists(state.board);
 
   const sensors = useSensors(
-    // A 6px threshold is what separates a tap (open the card) from a drag.
-    // Without it, every tap on a card body would begin a drag and the card
-    // would never open on a touch screen.
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
+    // A 6px threshold is what separates a click (open the card) from a drag.
+    useSensor(MouseSensor, { activationConstraint: { distance: 6 } }),
+    // On touch, a drag has to be a press-and-hold: a quick swipe on a card is
+    // the page scrolling, and a distance threshold alone would swallow it.
+    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 8 } }),
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
@@ -69,8 +71,8 @@ export function Board({ onOpenCard }: { onOpenCard: (id: string) => void }) {
       onDragEnd={onDragEnd}
       onDragCancel={() => setActiveId(null)}
     >
-      <div className="flex-1 overflow-x-auto overflow-y-hidden">
-        <div className="flex h-full snap-x snap-mandatory items-start gap-3 p-3 sm:snap-none">
+      <div className="flex-1 overflow-y-auto sm:overflow-x-auto sm:overflow-y-hidden">
+        <div className="flex flex-col gap-3 p-3 sm:h-full sm:flex-row sm:items-start">
           {lists.map((list) => (
             <List key={list.id} list={list} onOpenCard={onOpenCard} />
           ))}
