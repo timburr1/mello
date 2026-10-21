@@ -15,6 +15,10 @@ import type { Board } from './types.ts';
 export const SYNC_ENDPOINT = '/api/sync';
 export const AUTH_ME_ENDPOINT = '/.auth/me';
 
+// Linked to directly: the service worker answers any other navigation with the app shell, so a vanity route like /login never reaches the server.
+export const AUTH_LOGIN_ENDPOINT = '/.auth/login/github';
+export const AUTH_LOGOUT_ENDPOINT = '/.auth/logout';
+
 /** Thrown on a 401, meaning the Static Web Apps session has lapsed. */
 export class AuthRequiredError extends Error {
   constructor() {

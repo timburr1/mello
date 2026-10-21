@@ -3,6 +3,7 @@ import { exportBoard, parseImport } from '../lib/storage.ts';
 import { useBoard } from '../hooks/useBoard.ts';
 import { Modal } from './Modal.tsx';
 import { relativeTime } from '../lib/time.ts';
+import { AUTH_LOGIN_ENDPOINT, AUTH_LOGOUT_ENDPOINT } from '../lib/sync.ts';
 
 export function Settings({ onClose }: { onClose: () => void }) {
   const { state, dispatch, principal, syncNow } = useBoard();
@@ -53,7 +54,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 </span>
               </p>
               <a
-                href="/logout"
+                href={AUTH_LOGOUT_ENDPOINT}
                 className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:bg-sunken"
               >
                 Sign out
@@ -66,7 +67,7 @@ export function Settings({ onClose }: { onClose: () => void }) {
                 between your phone and desktop.
               </p>
               <a
-                href="/login"
+                href={AUTH_LOGIN_ENDPOINT}
                 className="shrink-0 rounded-md bg-accent px-3 py-1.5 text-sm font-medium text-accent-ink hover:opacity-90"
               >
                 Sign in

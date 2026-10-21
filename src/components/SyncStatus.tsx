@@ -1,5 +1,6 @@
 import { useBoard } from '../hooks/useBoard.ts';
 import { relativeTime } from '../lib/time.ts';
+import { AUTH_LOGIN_ENDPOINT } from '../lib/sync.ts';
 
 /**
  * A quiet status line, not a blocking indicator. The board works offline, so a
@@ -36,7 +37,7 @@ export function SyncStatus() {
       </span>
       {needsSignIn ? (
         <a
-          href="/login"
+          href={AUTH_LOGIN_ENDPOINT}
           className="rounded-md bg-accent px-2 py-1 font-medium text-accent-ink hover:opacity-90"
         >
           Sign in
