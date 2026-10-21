@@ -11,8 +11,8 @@ export default defineConfig({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'icons/apple-touch-icon.png'],
       manifest: {
-        name: 'mello',
-        short_name: 'mello',
+        name: 'Mello',
+        short_name: 'Mello',
         description: 'A todo board with recurring cards and no tracking.',
         theme_color: '#0f172a',
         background_color: '#0f172a',
